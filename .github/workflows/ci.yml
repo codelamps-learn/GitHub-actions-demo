@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:   # bisa juga dijalankan manual dari tab Actions
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        java-version: [17, 21]   # test di 2 versi JDK sekaligus (matrix build)
+
+    steps:
+      - name: Checkout kode
+        uses: actions/checkout@v4
+
+      - name: Setup JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ matrix.java-version }}
+          cache: 'maven'          # caching otomatis untuk ~/.m2 berdasarkan pom.xml
+
+      - name: Build & run unit test
+        run: mvn --batch-mode --no-transfer-progress clean verify
+
+      - name: Upload hasil test report
+        if: always()             # tetap upload report walau test gagal, untuk debugging
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-report-jdk${{ matrix.java-version }}
+          path: target/surefire-reports/
+          retention-days: 7
+
+      - name: Upload jar hasil build
+        if: matrix.java-version == 17   # cukup upload jar sekali saja, tidak perlu tiap versi JDK
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-calculator-jar
+          path: target/demo-calculator.jar
